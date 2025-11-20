@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grid Shape Solver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #fbbf24;
+    }
+
+    .panel {
+      background: #1f2937;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      max-width: 650px;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: #93c5fd;
+    }
+
+    label {
+      margin-right: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    select,
+    button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+    }
+
+    select {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      background: #4b5563;
+      cursor: not-allowed;
+    }
+
+    #symbol-palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .symbol-chip {
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      padding: 6px 10px;
+      min-width: 32px;
+      text-align: center;
+      font-size: 20px;
+      cursor: pointer;
+      color: #000000;
+    }
+
+    .symbol-chip.selected {
+      border: 2px solid #fbbf24;
+    }
+
+    #grid-container {
+      margin-top: 8px;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    table.grid {
+      border-collapse: collapse;
+      margin: 0 auto;
+    }
+
+    .grid-cell {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      text-align: center;
+      vertical-align: middle;
+      font-size: 22px;
+      cursor: pointer;
+      user-select: none;
+      color: #000000;
+    }
+
+    .grid-cell:hover {
+      background: #e5e7eb;
+    }
+
+    #status {
+      margin-top: 8px;
+      min-height: 20px;
+      font-size: 13px;
+    }
+
+    #status.error {
+      color: #fecaca;
+    }
+
+    #status.success {
+      color: #bbf7d0;
+    }
+
+    .buttons-row {
+      margin-top: 8px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Grid Shape Solver</h1>
+
+  <div class="panel">
+    <h2>Step 1: Choose Grid & Symbols</h2>
+    <label>
+      Grid size:
+      <select id="grid-size">
+        <option value="2">2 × 2</option>
+        <option value="3" selected>3 × 3</option>
+        <option value="4">4 × 4</option>
+        <option value="5">5 × 5</option>
+        <option value="6">6 × 6</option>
+        <option value="7">7 × 7</option>
+        <option value="8">8 × 8</option>
+        <option value="9">9 × 9</option>
+        <option value="10">10 × 10</option>
+      </select>
+    </label>
+    <label>
+      Symbols:
+      <select id="symbol-count">
+        <option value="2">2</option>
+        <option value="3" selected>3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <button id="create-grid-btn">Create Grid</button>
+  </div>
+
+  <div class="panel" id="game-panel" style="display:none;">
+    <h2>Step 2: Fill Some Cells, Then Solve</h2>
+
+    <div id="symbol-palette"></div>
+    <div id="grid-container"></div>
+
+    <div class="buttons-row">
+      <button id="solve-btn">Solve</button>
+      <button id="clear-btn">Clear Grid</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // ---------- Global State ----------
+    let gridSize = 3;
+    let symbolsCount = 3;
+    let symbolsConfig = []; // {label: '▲'}
+    let currentSymbolIndex = null;
+
+    const shapeChars = ["▲", "■", "★", "●", "◆", "☀", "✚", "⬟", "⬢", "⬣"];
+
+    const gridSizeSelect = document.getElementById("grid-size");
+    const symbolCountSelect = document.getElementById("symbol-count");
+    const createGridBtn = document.getElementById("create-grid-btn");
+    const gamePanel = document.getElementById("game-panel");
+    const symbolPalette = document.getElementById("symbol-palette");
+    const gridContainer = document.getElementById("grid-container");
+    const solveBtn = document.getElementById("solve-btn");
+    const clearBtn = document.getElementById("clear-btn");
+    const statusEl = document.getElementById("status");
+
+    createGridBtn.addEventListener("click", () => {
+      gridSize = parseInt(gridSizeSelect.value, 10);
+      symbolsCount = parseInt(symbolCountSelect.value, 10);
+
+      if (symbolsCount < 2) {
+        showStatus("Use at least 2 symbols.", true);
+        return;
+      }
+      if (symbolsCount > 10) {
+        showStatus("Maximum 10 symbols supported.", true);
+        return;
+      }
+
+      setupSymbols();
+      renderSymbolPalette();
+      renderGrid();
+      gamePanel.style.display = "block";
+      showStatus(
+        "Select a shape above, then click cells to place it. Click again to clear.",
+        false
+      );
+    });
+
+    function setupSymbols() {
+      symbolsConfig = [];
+      for (let i = 0; i < symbolsCount; i++) {
+        symbolsConfig.push({ label: shapeChars[i] });
+      }
+      currentSymbolIndex = 0;
+    }
+
+    function renderSymbolPalette() {
+      symbolPalette.innerHTML = "";
+      symbolsConfig.forEach((sym, index) => {
+        const chip = document.createElement("div");
+        chip.className =
+          "symbol-chip" + (index === currentSymbolIndex ? " selected" : "");
+        chip.textContent = sym.label;
+        chip.dataset.index = index;
+        chip.addEventListener("click", () => {
+          currentSymbolIndex = index;
+          updatePaletteSelection();
+        });
+        symbolPalette.appendChild(chip);
+      });
+    }
+
+    function updatePaletteSelection() {
+      document.querySelectorAll(".symbol-chip").forEach((chip) => {
+        chip.classList.remove("selected");
+      });
+      const selected = document.querySelector(
+        `.symbol-chip[data-index="${currentSymbolIndex}"]`
+      );
+      if (selected) selected.classList.add("selected");
+    }
+
+    function renderGrid() {
+      gridContainer.innerHTML = "";
+      const table = document.createElement("table");
+      table.className = "grid";
+
+      for (let r = 0; r < gridSize; r++) {
+        const tr = document.createElement("tr");
+        for (let c = 0; c < gridSize; c++) {
+          const td = document.createElement("td");
+          td.className = "grid-cell";
+          td.dataset.row = r;
+          td.dataset.col = c;
+          td.dataset.symIndex = "";
+          td.addEventListener("click", () => onCellClick(td));
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+
+      gridContainer.appendChild(table);
+    }
+
+    function onCellClick(cell) {
+      if (currentSymbolIndex === null) {
+        showStatus("Select a shape from the palette first.", true);
+        return;
+      }
+      const existing = cell.dataset.symIndex;
+      if (existing !== "" && parseInt(existing, 10) === currentSymbolIndex) {
+        // toggle off
+        cell.textContent = "";
+        cell.dataset.symIndex = "";
+      } else {
+        cell.textContent = symbolsConfig[currentSymbolIndex].label;
+        cell.dataset.symIndex = currentSymbolIndex;
+      }
+    }
+
+    clearBtn.addEventListener("click", () => {
+      document.querySelectorAll(".grid-cell").forEach((cell) => {
+        cell.textContent = "";
+        cell.dataset.symIndex = "";
+      });
+      showStatus("Grid cleared.", false);
+    });
+
+    solveBtn.addEventListener("click", () => {
+      const result = solvePuzzle();
+      if (!result.success) {
+        showStatus(result.message || "No solution for this setup.", true);
+      } else {
+        applySolutionToGrid(result.grid);
+        showStatus(
+          "Solved! No shape repeats in any row or column.",
+          false,
+          true
+        );
+      }
+    });
+
+    function showStatus(msg, isError = false, isSuccess = false) {
+      statusEl.textContent = msg;
+      statusEl.classList.remove("error", "success");
+      if (isError) statusEl.classList.add("error");
+      if (isSuccess) statusEl.classList.add("success");
+    }
+
+    // ---------- Solver ----------
+
+    function readGridFromDOM() {
+      const grid = Array.from({ length: gridSize }, () =>
+        Array(gridSize).fill(null)
+      );
+      document.querySelectorAll(".grid-cell").forEach((cell) => {
+        const r = parseInt(cell.dataset.row, 10);
+        const c = parseInt(cell.dataset.col, 10);
+        const sym = cell.dataset.symIndex;
+        if (sym !== "") {
+          grid[r][c] = parseInt(sym, 10);
+        }
+      });
+      return grid;
+    }
+
+    function solvePuzzle() {
+      const grid = readGridFromDOM();
+      const n = gridSize;
+      const m = symbolsConfig.length;
+
+      const rowUsed = Array.from({ length: n }, () =>
+        Array(m).fill(false)
+      );
+      const colUsed = Array.from({ length: n }, () =>
+        Array(m).fill(false)
+      );
+
+      // initialize from current grid
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          const s = grid[r][c];
+          if (s !== null) {
+            if (rowUsed[r][s] || colUsed[c][s]) {
+              return {
+                success: false,
+                message: `Conflict already in row ${r + 1}, col ${c + 1}.`,
+              };
+            }
+            rowUsed[r][s] = true;
+            colUsed[c][s] = true;
+          }
+        }
+      }
+
+      const empties = [];
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (grid[r][c] === null) empties.push([r, c]);
+        }
+      }
+
+      function backtrack(pos) {
+        if (pos === empties.length) return true;
+        const [r, c] = empties[pos];
+        for (let s = 0; s < m; s++) {
+          if (rowUsed[r][s] || colUsed[c][s]) continue;
+          grid[r][c] = s;
+          rowUsed[r][s] = true;
+          colUsed[c][s] = true;
+          if (backtrack(pos + 1)) return true;
+          grid[r][c] = null;
+          rowUsed[r][s] = false;
+          colUsed[c][s] = false;
+        }
+        return false;
+      }
+
+      const success = backtrack(0);
+      return {
+        success,
+        grid,
+        message: success ? null : "No solution exists.",
+      };
+    }
+
+    function applySolutionToGrid(grid) {
+      document.querySelectorAll(".grid-cell").forEach((cell) => {
+        const r = parseInt(cell.dataset.row, 10);
+        const c = parseInt(cell.dataset.col, 10);
+        const s = grid[r][c];
+        if (s === null) {
+          cell.textContent = "";
+          cell.dataset.symIndex = "";
+        } else {
+          cell.textContent = symbolsConfig[s].label;
+          cell.dataset.symIndex = s;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
